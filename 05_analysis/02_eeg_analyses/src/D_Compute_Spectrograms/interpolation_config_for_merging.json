@@ -1,0 +1,105 @@
+{
+    "VisualOnly_Narrow_Slow": {
+        "type": "visual",
+        "N_visual_points": 2600,
+        "N_sec_after_onset": 2.5
+    },
+    "VisualOnly_Narrow_Fast": {
+        "type": "visual",
+        "N_visual_points": 2600,
+        "N_sec_after_onset": 2.6
+    },
+
+
+
+    "D1_Narrow_Fast": {
+        "type": "vibrotactile",
+        "N1_points": 750,
+        "N2_points": 1850,
+        "N_sec_after_vibration": 1.85
+    },
+    "D1_Narrow_Slow": {
+        "type": "vibrotactile",
+        "N1_points": 1800,
+        "N2_points": 800,
+        "N_sec_after_vibration": 0.8
+    },
+    "D2_Narrow_Fast": {
+        "type": "vibrotactile",
+        "N1_points": 750,
+        "N2_points": 1850,
+        "N_sec_after_vibration": 1.85
+    },
+    "D2_Narrow_Slow": {
+        "type": "vibrotactile",
+        "N1_points": 1800,
+        "N2_points": 800,
+        "N_sec_after_vibration": 0.8
+    },
+    "D3_Narrow_Fast": {
+        "type": "vibrotactile",
+        "N1_points": 750,
+        "N2_points": 1850,
+        "N_sec_after_vibration": 1.85
+    },
+    "D3_Narrow_Slow": {
+        "type": "vibrotactile",
+        "N1_points": 1800,
+        "N2_points": 800,
+        "N_sec_after_vibration": 0.8
+    },
+
+
+
+    "D4_Narrow_Fast": {
+        "type": "vibrotactile",
+        "N1_points": 350,
+        "N2_points": 2250,
+        "N_sec_after_vibration": 2.25
+    },
+    "D4_Narrow_Slow": {
+        "type": "vibrotactile",
+        "N1_points": 950,
+        "N2_points": 1650,
+        "N_sec_after_vibration": 1.65
+    },
+    "D5_Narrow_Fast": {
+        "type": "vibrotactile",
+        "N1_points": 350,
+        "N2_points": 2250,
+        "N_sec_after_vibration": 2.25
+    },
+    "D5_Narrow_Slow": {
+        "type": "vibrotactile",
+        "N1_points": 950,
+        "N2_points": 1650,
+        "N_sec_after_vibration": 1.65
+    },
+    "D6_Narrow_Fast": {
+        "type": "vibrotactile",
+        "N1_points": 350,
+        "N2_points": 2250,
+        "N_sec_after_vibration": 2.25
+    },
+    "D6_Narrow_Slow": {
+        "type": "vibrotactile",
+        "N1_points": 950,
+        "N2_points": 1650,
+        "N_sec_after_vibration": 1.65
+    },
+
+
+
+    "D7_Narrow_Fast": {
+        "type": "vibrotactile",
+        "N1_points": 0,
+        "N2_points": 2600,
+        "N_sec_after_vibration": 2.6
+    },
+    "D7_Narrow_Slow": {
+        "type": "vibrotactile",
+        "N1_points": 0,
+        "N2_points": 2600,
+        "N_sec_after_vibration": 2.6
+    }
+}
