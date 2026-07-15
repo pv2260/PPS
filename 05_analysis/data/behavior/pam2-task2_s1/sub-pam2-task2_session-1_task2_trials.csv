@@ -1,0 +1,5 @@
+﻿subject_id,session_number,block_number,trial_number,trial_type,correct_response,previous_speed,current_speed,speed_sequence,transition_status,trajectory_offset_cm,trial_trigger_code,response_trigger_code,trigger_timestamp,participant_response,reaction_time_ms,accuracy,trial_interrupted,timestamp
+pam2-task2,1,1,1,near_hit,MISS,none,slow,start-slow,start,-33.95,0,0,0.0000,HIT,932.65,0,0,2026-07-14T17:12:46.1528433+02:00
+pam2-task2,1,1,2,clear_miss,MISS,slow,slow,slow-slow,repetition,69.26,0,0,0.0000,MISS,654.64,1,0,2026-07-14T17:12:52.4583685+02:00
+pam2-task2,1,1,3,clear_hit,HIT,slow,slow,slow-slow,repetition,-20.78,0,0,0.0000,HIT,1043.53,1,0,2026-07-14T17:12:59.2099481+02:00
+pam2-task2,1,1,4,near_miss,MISS,slow,slow,slow-slow,repetition,49.60,0,0,0.0000,MISS,738.06,1,0,2026-07-14T17:13:06.2411337+02:00
