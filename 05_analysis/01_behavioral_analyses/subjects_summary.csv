@@ -1,0 +1,4 @@
+subject,session,task,file,folder,n_raw_rows,group,cohort,has_dbs,shoulder_width_cm
+pam2,1,2,sub-pam2-task2_session-1_task2_trials.csv,pam2-task2_s1,4,unknown,unknown,False,42.0
+pam,1,2,sub-pam_session-1_task2_trials.csv,pam_s1-task2,210,control,pilot,False,42.0
+pam,1,1,sub-pam_session-1_task1_trials.csv,pam_s1,462,control,pilot,False,42.0

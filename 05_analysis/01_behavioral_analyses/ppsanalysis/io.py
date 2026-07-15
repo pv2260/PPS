@@ -52,10 +52,13 @@ def clean_pps(df, subject, session, meta):
         errors="coerce"
     )
 
+    # reaction_time_ms in this Unity export logs ball position in metres at
+    # the moment of response (0.15 m = D1 … 3.25 m = D7), not a duration.
+    # response_time_ms is the true RT already computed by Unity
+    # (response absolute time − vibrotactile onset), so use it directly.
+    out["rt_ms"] = pd.to_numeric(pick(df, "response_time_ms"), errors="coerce")
     if "reaction_time_ms" in df.columns:
-        out["rt_ms"] = pd.to_numeric(df["reaction_time_ms"], errors="coerce")
-    else:
-        out["rt_ms"] = out["response_time_ms"] - out["vibrotactile_onset_ms"]
+        out["distance_at_response_m"] = pd.to_numeric(df["reaction_time_ms"], errors="coerce")
 
     out["response_made"] = (
         pick(df, "response_made")
