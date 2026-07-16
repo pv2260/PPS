@@ -1,38 +1,44 @@
 """
-H5. Does the patient show distance-dependent PPS facilitation at all?
+H5. Is the patient's speed-dependent PPS recalibration altered?
 
 WHAT WE ARE TESTING
 -------------------
-This is the single-case version of H1. We have ONE patient, so we cannot do a
-group test. Instead we ask: is this patient's near-far index bigger than we would
-expect if distance did not matter at all?
+H2 showed (or did not show) that healthy people move their PPS boundary outward
+when the stimulus comes at them faster. H5 asks two questions about the patient:
 
-HOW THE PERMUTATION TEST WORKS
-------------------------------
-The logic is simple, and it is worth being clear about because permutation tests
-are often described badly.
+    TEST A. Does the patient recalibrate AT ALL?
+            Is their Delta_PPS bigger than chance?
 
-  1. We compute the patient's real NearFar_PPS. Call it the OBSERVED value.
+    TEST B. Does the patient recalibrate DIFFERENTLY from their matched control?
+            Is  D_PPS = Delta_PPS(patient) - Delta_PPS(control)  reliably non-zero?
 
-  2. We then destroy the link between RT and distance, by SHUFFLING the distance
-     labels across the patient's trials. A trial that really happened at D1 might
-     now be labelled D6. Everything else about the data is untouched.
+TEST B IS GATED ON TEST A
+-------------------------
+We only interpret Test B if Test A passes. The reason: if the patient shows no
+recalibration signal at all, then their Delta_PPS is just noise, and comparing
+noise to a control tells you nothing. Running Test B anyway would let you claim
+"reduced recalibration" when what you actually have is "no measurement".
 
-  3. We recompute NearFar_PPS on the shuffled data. Because the distance labels
-     are now meaningless, any near-far difference we get is pure chance.
+WHICH SESSIONS
+--------------
+The prereg says: patient's HIGH-dopamine session, control's session 1.
+H7 and H8b both reuse this choice, so we save it into t.patient_session.
 
-  4. We repeat steps 2 and 3 five thousand times. That gives us a whole
-     distribution of "near-far differences you get by chance". This is the NULL.
+HOW TEST A WORKS
+----------------
+Same permutation logic as H5, but we shuffle SPEED labels instead of distance
+labels. If speed does not matter, then relabelling slow trials as fast (and vice
+versa) should not change Delta_PPS. Do that 5000 times and you get the null.
 
-  5. The p-value is: what fraction of the null values are at least as extreme as
-     the observed one?
+HOW TEST B WORKS
+----------------
+We bootstrap the patient's trials and the control's trials, recompute Delta_PPS
+for each on every resample, and take the difference. Then we ask: what fraction
+of the resamples give a difference of the same sign?
 
-If the observed value sits way out in the tail of the null, then distance really
-does matter for this patient.
-
-SUPPORTED IF
-------------
-In EVERY available patient session: NearFar_PPS > 0 AND permutation p < 0.05.
+    D_PPS < 0 in >= 95% of resamples  ->  under-calibration
+    D_PPS > 0 in >= 95% of resamples  ->  over-calibration
+    otherwise                         ->  inconclusive
 """
 
 import numpy as np
@@ -43,169 +49,284 @@ import style
 
 from .. import config
 from .. import figures
-from ..permutations import permute_distance_labels_nearfar
+from ..pps import compute_facilitation, sigmoid_boundary_by_subject, bootstrap_pps_delta_one_session
+from ..permutations import permute_speed_labels_delta_pps
+
+
+def pick_high_dopamine_session(patient_trials, preferred_cohort="high"):
+    """Find the patient's HIGH-dopamine session.
+
+    Falls back to the first session if no cohort is labelled 'high'. That
+    fallback is deliberate: it lets the pipeline run end to end on data where
+    dopamine state was not recorded, rather than crashing. But if it fires, the
+    session you get is NOT necessarily the high-dopamine one, so we say so.
+    """
+
+    sessions = (
+        patient_trials[["session", "cohort"]]
+        .dropna(subset=["session"])
+        .drop_duplicates()
+    )
+
+    if len(sessions) == 0:
+        return None, False
+
+    matches_cohort = sessions["cohort"].str.lower().str.contains(
+        preferred_cohort,
+        na=False,
+    )
+
+    if matches_cohort.any():
+        session = int(sessions.loc[matches_cohort, "session"].iloc[0])
+        return session, True
+
+    # No cohort label found. Use the first session, and flag that we guessed.
+    return int(sessions["session"].iloc[0]), False
+
+
+def delta_pps_for_one_session(trials):
+    """Compute Delta_PPS for one person's one session. NaN if it cannot be fitted."""
+
+    facilitation = compute_facilitation(trials)
+    boundary_table = sigmoid_boundary_by_subject(facilitation, split_speed=True)
+
+    if len(boundary_table) == 0:
+        return np.nan
+
+    return float(boundary_table["delta_pps"].iloc[0])
 
 
 def run(t, plot=True):
-    """Run H5. Returns {"skipped": True} if there is no patient in the data."""
-
-    # ------------------------------------------------------------------
-    # Step 0. Do we even have a patient?
-    # ------------------------------------------------------------------
+    """Run H5."""
 
     if not t.has_patient:
         print("H5 skipped: there is no patient in this dataset.")
-        print("  This is expected while you are only running healthy pilots.")
         return {"skipped": True}
 
     results = {"skipped": False}
 
-    print(f"Patient:         {t.patient_id}")
-    print(f"Matched control: {t.control_id}")
-    print()
+    patient_trials_all = t.pps_trials[t.pps_trials["subject"] == t.patient_id].copy()
 
     # ------------------------------------------------------------------
-    # Step 1. Get the patient's PPS trials, session by session.
+    # Step 1. Choose the sessions.
     # ------------------------------------------------------------------
 
-    patient_trials = t.pps_trials[t.pps_trials["subject"] == t.patient_id].copy()
+    patient_session, cohort_was_labelled = pick_high_dopamine_session(patient_trials_all)
+    control_session = t.control_session   # prereg convention: 1
 
-    sessions = sorted(patient_trials["session"].dropna().unique())
+    if not cohort_was_labelled:
+        print("WARNING: no session is labelled with a 'high' cohort.")
+        print(f"  Falling back to session {patient_session}, which may NOT be the")
+        print()
 
-    print(f"Patient PPS sessions available: {sessions}")
+    print(f"Patient session (high dopamine): {patient_session}")
+    print(f"Control session:                 {control_session}")
     print()
+
+    # These two names are what the notebook copies into t.patient_session and
+    # t.control_session, which H7 and H8b then read.
+    results["PATIENT_SESSION_USED"] = patient_session
+    results["CONTROL_SESSION_USED"] = control_session
+
+    patient_trials = t.pps_trials[
+        (t.pps_trials["subject"] == t.patient_id)
+        & (t.pps_trials["session"] == patient_session)
+    ].copy()
+
+    control_trials = t.pps_trials[
+        (t.pps_trials["subject"] == t.control_id)
+        & (t.pps_trials["session"] == control_session)
+    ].copy()
 
     results["patient_trials"] = patient_trials
-    results["sessions"] = sessions
+    results["control_trials"] = control_trials
 
     # ------------------------------------------------------------------
-    # Step 2. Run the permutation test in each session.
+    # Step 2. The observed Delta_PPS for each person.
     # ------------------------------------------------------------------
 
-    rows = []
-    permutation_results = {}
+    patient_delta_pps = delta_pps_for_one_session(patient_trials)
+    control_delta_pps = delta_pps_for_one_session(control_trials)
 
-    for session in sessions:
+    d_pps_observed = patient_delta_pps - control_delta_pps
 
-        one_session = patient_trials[patient_trials["session"] == session].copy()
+    results["patient_delta_pps"] = patient_delta_pps
+    results["control_delta_pps"] = control_delta_pps
+    results["d_pps_observed"] = d_pps_observed
 
-        # The seed is offset by the session number so that session 1 and session 2
-        # do not get the exact same 5000 shuffles. Same seed = same shuffles =
-        # correlated results, which would be wrong.
-        permutation = permute_distance_labels_nearfar(
-            one_session,
-            n_perm=config.N_BOOT,
-            seed=config.RANDOM_SEED + int(session),
+    print(f"Patient Delta_PPS = {patient_delta_pps:.3f}")
+    print(f"Control Delta_PPS = {control_delta_pps:.3f}")
+    print(f"Observed D_PPS    = {d_pps_observed:.3f}   (patient minus control)")
+    print()
+
+    # ------------------------------------------------------------------
+    # Step 3. TEST A: does the patient recalibrate at all?
+    # ------------------------------------------------------------------
+
+    print("--- Test A: does the patient show any Delta_PPS? ---")
+
+    test_a = permute_speed_labels_delta_pps(
+        patient_trials,
+        n_perm=config.N_BOOT,
+        seed=config.RANDOM_SEED,
+    )
+
+    test_a_supported = (test_a["observed"] > 0) and (test_a["p"] < config.ALPHA)
+
+    print(f"  observed Delta_PPS = {test_a['observed']:.3f}")
+    print(f"  permutation p      = {test_a['p']:.4f}")
+    print(f"  Test A supported   = {test_a_supported}")
+    print()
+
+    results["test_a"] = test_a
+    results["test_a_supported"] = test_a_supported
+
+    # ------------------------------------------------------------------
+    # Step 4. TEST B, but only if Test A passed.
+    # ------------------------------------------------------------------
+
+    if not test_a_supported:
+        print("Test A did not pass, so Test B is NOT run.")
+        print("  Without a recalibration signal in the patient, comparing their")
+        print("  Delta_PPS to the control's would just be comparing noise.")
+
+        results["h5_classification"] = "Test A failed; Test B not run"
+        results["h5_pair_boot"] = pd.DataFrame()
+
+    else:
+        print("--- Test B: does the patient differ from the matched control? ---")
+
+        # Bootstrap each person separately. Different seeds so the two are not
+        # accidentally resampled in lockstep.
+        patient_boot = bootstrap_pps_delta_one_session(
+            patient_trials,
+            n_boot=config.N_BOOT,
+            seed=config.RANDOM_SEED,
+        )
+        control_boot = bootstrap_pps_delta_one_session(
+            control_trials,
+            n_boot=config.N_BOOT,
+            seed=config.RANDOM_SEED + 1,
         )
 
-        permutation_results[session] = permutation
+        # Merge on the bootstrap index, so resample #37 of the patient is paired
+        # with resample #37 of the control. H8b later reuses this same pairing.
+        paired = patient_boot.merge(
+            control_boot,
+            on="boot",
+            suffixes=("_patient", "_control"),
+        )
 
-        observed = permutation["observed"]
-        p_value = permutation["p"]
+        paired["d_pps"] = paired["delta_pps_patient"] - paired["delta_pps_control"]
 
-        session_supported = (observed > 0) and (p_value < config.ALPHA)
+        proportion_negative = float((paired["d_pps"] < 0).mean())
+        proportion_positive = float((paired["d_pps"] > 0).mean())
 
-        rows.append({
-            "session": session,
-            "n_usable_trials": int(one_session["usable"].sum()),
-            "observed_nearfar_ms": observed,
-            "permutation_p": p_value,
-            "n_permutations": permutation["n_perm"],
-            "supported": session_supported,
-        })
+        if proportion_negative >= config.BOOT_SIGN_THRESHOLD:
+            classification = "supported: under-calibration"
+        elif proportion_positive >= config.BOOT_SIGN_THRESHOLD:
+            classification = "supported: over-calibration"
+        else:
+            classification = "inconclusive"
 
-    summary = pd.DataFrame(rows)
+        ci_low, ci_high = np.percentile(paired["d_pps"].dropna(), [2.5, 97.5])
 
-    results["summary"] = summary
-    results["permutation_results"] = permutation_results
+        print(f"  D_PPS 95% CI     = [{ci_low:.3f}, {ci_high:.3f}]")
+        print(f"  P(D_PPS < 0)     = {proportion_negative:.3f}")
+        print(f"  P(D_PPS > 0)     = {proportion_positive:.3f}")
+        print(f"  classification   = {classification}")
 
-    # ------------------------------------------------------------------
-    # Step 3. The verdict. Every session must pass.
-    # ------------------------------------------------------------------
-
-    if len(summary) > 0:
-        supported_overall = bool(summary["supported"].all())
-    else:
-        supported_overall = False
-
-    # This name is what the notebook's summary table reads.
-    results["h5_supported_overall"] = supported_overall
-
-    report(results)
+        results["h5_pair_boot"] = paired
+        results["h5_classification"] = classification
+        results["proportion_negative"] = proportion_negative
+        results["proportion_positive"] = proportion_positive
+        results["ci_low"] = ci_low
+        results["ci_high"] = ci_high
 
     if plot:
         fig = make_figure(results)
-        figures.save(fig, "h5_patient_nearfar")
+        figures.save(fig, "h5_patient_recalibration")
         plt.show()
         results["figure"] = fig
 
     return results
 
 
-def report(results):
-    """Print the H5 numbers."""
-
-    print("H5: near-far index in the patient, tested against a shuffled-distance null")
-    print()
-    print(results["summary"].round(4).to_string(index=False))
-    print()
-
-    if results["h5_supported_overall"]:
-        print("  H5 IS SUPPORTED: in every session the patient's facilitation was")
-        print("  stronger near the body than chance would produce.")
-    else:
-        print("  H5 is NOT supported in every session.")
-
-
 def make_figure(results):
-    """Build the H5 figure. One null-distribution histogram per session."""
+    """Build the H5 figure. Test A null on the left, Test B bootstrap on the right."""
 
-    sessions = results["sessions"]
-    permutation_results = results["permutation_results"]
+    fig, axes = figures.new_figure(n_panels=2, height=2.8)
 
-    n_panels = max(1, len(sessions))
+    # --- Panel A: Test A null distribution -----------------------------------
+    ax = axes[0]
 
-    fig, axes = figures.new_figure(
-        n_panels=n_panels,
-        width=figures.DOUBLE_COLUMN if n_panels > 1 else figures.ONE_HALF_COLUMN,
-        height=2.6,
+    test_a = results["test_a"]
+
+    ax.hist(
+        test_a["permuted"],
+        bins=40,
+        color=style.CONTROL,
+        edgecolor="white",
+        linewidth=0.3,
     )
 
-    for ax, session in zip(axes, sessions):
+    ax.axvline(
+        test_a["observed"],
+        color=style.PATIENT,
+        linewidth=1.8,
+        label=f"observed = {test_a['observed']:.3f}",
+    )
+    ax.axvline(0, linestyle="--", linewidth=0.8, color="gray")
 
-        permutation = permutation_results[session]
+    ax.set_xlabel(r"$\Delta_{PPS}$ under shuffled speed labels")
+    ax.set_ylabel("Count")
+    ax.set_title(f"Test A: p = {test_a['p']:.4f}")
+    ax.legend()
 
-        # The grey histogram is the null: every near-far value we got by shuffling
-        # the distance labels. If distance did not matter, the real value would
-        # land somewhere in here.
+    style.clean(ax)
+
+    # --- Panel B: Test B bootstrap -------------------------------------------
+    ax = axes[1]
+
+    paired = results["h5_pair_boot"]
+
+    if len(paired) == 0:
+        ax.text(
+            0.5, 0.5,
+            "Test B not run\n(Test A did not pass)",
+            ha="center", va="center",
+            transform=ax.transAxes,
+            fontsize=8,
+            color="#8A8A8A",
+        )
+        ax.set_xticks([])
+        ax.set_yticks([])
+    else:
         ax.hist(
-            permutation["permuted"],
+            paired["d_pps"].dropna(),
             bins=40,
-            color=style.CONTROL,
+            color=style.PATIENT,
+            alpha=0.55,
             edgecolor="white",
             linewidth=0.3,
         )
 
-        # The patient's real value.
         ax.axvline(
-            permutation["observed"],
-            color=style.PATIENT,
+            results["d_pps_observed"],
+            color=style.INK,
             linewidth=1.8,
-            label=f"observed = {permutation['observed']:.1f} ms",
+            label=f"observed = {results['d_pps_observed']:.3f}",
         )
-
         ax.axvline(0, linestyle="--", linewidth=0.8, color="gray")
 
-        ax.set_xlabel("NearFar$_{PPS}$ under shuffled\ndistance labels (ms)")
+        ax.set_xlabel(r"$D_{PPS}$ = patient $-$ control")
         ax.set_ylabel("Count")
-        ax.set_title(f"Session {session}: p = {permutation['p']:.4f}")
+        ax.set_title(results["h5_classification"])
         ax.legend()
 
         style.clean(ax)
 
-    if len(sessions) > 1:
-        figures.label_panels(axes)
-
+    figures.label_panels(axes)
     fig.tight_layout()
 
     return fig

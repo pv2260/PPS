@@ -1,5 +1,5 @@
 """
-H8a. Across young controls: does PPS plasticity go with Hit-or-Miss performance?
+H7a. Across young controls: does PPS plasticity go with Hit-or-Miss performance?
 
 WHAT WE ARE TESTING
 -------------------
@@ -64,7 +64,7 @@ def build_table(t):
     # inner join: a participant needs BOTH tasks to appear here.
     table = pps_part.merge(collision_part, on="subject", how="inner")
 
-    print("H8a data table (one row per young control):")
+    print("H7a data table (one row per young control):")
     print()
     print(table.round(3).to_string(index=False))
     print()
@@ -146,7 +146,7 @@ def scatter(ax, table, x_column, y_column, x_label, y_label, title, result):
 
 
 def run(t, plot=True):
-    """Run all three parts of H8a."""
+    """Run all three parts of H7a."""
 
     table = build_table(t)
 
@@ -156,29 +156,29 @@ def run(t, plot=True):
     # The three correlations.
     # ------------------------------------------------------------------
 
-    results["h8a_1"] = correlate(
+    results["h7a_1"] = correlate(
         table, "delta_pps", "delta_coll", "greater",
-        "H8a.1: Delta_PPS with Delta_coll (predicted POSITIVE)",
+        "H7a.1: Delta_PPS with Delta_coll (predicted POSITIVE)",
     )
 
-    results["h8a_2_near"] = correlate(
+    results["h7a_2_near"] = correlate(
         table, "delta_pps", "near_boundary_accuracy", "greater",
-        "H8a.2: Delta_PPS with near-boundary accuracy (PRIMARY, predicted POSITIVE)",
+        "H7a.2: Delta_PPS with near-boundary accuracy (PRIMARY, predicted POSITIVE)",
     )
 
-    results["h8a_2_overall"] = correlate(
+    results["h7a_2_overall"] = correlate(
         table, "delta_pps", "accuracy", "greater",
-        "H8a.2: Delta_PPS with overall accuracy (descriptive only)",
+        "H7a.2: Delta_PPS with overall accuracy (descriptive only)",
     )
 
-    results["h8a_3"] = correlate(
+    results["h7a_3"] = correlate(
         table, "delta_pps", "carryover_cm", "less",
-        "H8a.3: Delta_PPS with carryover (predicted NEGATIVE)",
+        "H7a.3: Delta_PPS with carryover (predicted NEGATIVE)",
     )
 
     if plot:
         fig = make_figure(results)
-        figures.save(fig, "h8a_correlations")
+        figures.save(fig, "h7a_correlations")
         plt.show()
         results["figure"] = fig
 
@@ -186,7 +186,7 @@ def run(t, plot=True):
 
 
 def make_figure(results):
-    """Build the H8a figure. Four scatter panels."""
+    """Build the H7a figure. Four scatter panels."""
 
     table = results["table"]
 
@@ -199,25 +199,25 @@ def make_figure(results):
     scatter(
         axes[0], table, "delta_pps", "delta_coll",
         r"$\Delta_{PPS}$", r"$\Delta_{coll}$ (cm)",
-        "H8a.1", results["h8a_1"],
+        "H7a.1", results["h7a_1"],
     )
 
     scatter(
         axes[1], table, "delta_pps", "near_boundary_accuracy",
         r"$\Delta_{PPS}$", "Near-boundary accuracy",
-        "H8a.2 (primary)", results["h8a_2_near"],
+        "H7a.2 (primary)", results["h7a_2_near"],
     )
 
     scatter(
         axes[2], table, "delta_pps", "accuracy",
         r"$\Delta_{PPS}$", "Overall accuracy",
-        "H8a.2 (descriptive)", results["h8a_2_overall"],
+        "H7a.2 (descriptive)", results["h7a_2_overall"],
     )
 
     scatter(
         axes[3], table, "delta_pps", "carryover_cm",
         r"$\Delta_{PPS}$", "Carryover (cm)",
-        "H8a.3", results["h8a_3"],
+        "H7a.3", results["h7a_3"],
     )
 
     figures.label_panels(axes)

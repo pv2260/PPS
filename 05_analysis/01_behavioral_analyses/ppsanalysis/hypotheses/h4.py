@@ -1,38 +1,38 @@
 """
-H4. Test-retest reliability: do our measures give the same answer twice?
+H4. Does the patient show distance-dependent PPS facilitation at all?
 
 WHAT WE ARE TESTING
 -------------------
-Every participant does the task twice. If a measure is any good, a participant
-who scored high in session 1 should also score high in session 2.
+This is the single-case version of H1. We have ONE patient, so we cannot do a
+group test. Instead we ask: is this patient's near-far index bigger than we would
+expect if distance did not matter at all?
 
-We check four measures:
+HOW THE PERMUTATION TEST WORKS
+------------------------------
+The logic is simple, and it is worth being clear about because permutation tests
+are often described badly.
 
-    x_c         the PPS boundary (pooled over speeds)
-    pse_pooled  the collision boundary (pooled over speeds)
-    delta_pps   the speed-induced shift in the PPS boundary
-    delta_coll  the speed-induced shift in the collision boundary
+  1. We compute the patient's real NearFar_PPS. Call it the OBSERVED value.
 
-WHAT WE COMPUTE
----------------
-1. Spearman rank correlation between session 1 and session 2.
-   With only 5 participants we cannot use a normal p-value, so we enumerate all
-   5! = 120 possible orderings and count how many give a correlation at least as
-   big as the one we saw. That is an EXACT permutation p-value.
+  2. We then destroy the link between RT and distance, by SHUFFLING the distance
+     labels across the patient's trials. A trial that really happened at D1 might
+     now be labelled D6. Everything else about the data is untouched.
 
-2. SDC, the Smallest Detectable Change:
+  3. We recompute NearFar_PPS on the shuffled data. Because the distance labels
+     are now meaningless, any near-far difference we get is pure chance.
 
-       SDC = 1.96 * SD(session1 - session2) * sqrt(2)
+  4. We repeat steps 2 and 3 five thousand times. That gives us a whole
+     distribution of "near-far differences you get by chance". This is the NULL.
 
-   This is the NOISE FLOOR. Any within-person change smaller than the SDC could
-   just be measurement error. H6b uses the SDC for delta_pps to decide whether a
-   dopamine effect is real or is just the task being noisy.
+  5. The p-value is: what fraction of the null values are at least as extreme as
+     the observed one?
 
-INTERPRETATION
---------------
-At n = 5 this is DESCRIPTIVE. We are not testing a hypothesis here, we are
-reporting how noisy our own measures are. The SDC is the number that actually
-gets used later.
+If the observed value sits way out in the tail of the null, then distance really
+does matter for this patient.
+
+SUPPORTED IF
+------------
+In EVERY available patient session: NearFar_PPS > 0 AND permutation p < 0.05.
 """
 
 import numpy as np
@@ -43,135 +43,99 @@ import style
 
 from .. import config
 from .. import figures
-from ..stats_utils import exact_spearman_permutation, compute_sdc
-
-
-def build_session_pairs(measure_table, value_column):
-    """Reshape a per-session measure into one row per subject: s1 and s2.
-
-    Only subjects who have BOTH sessions are kept. A subject with one session
-    cannot tell us anything about reliability.
-    """
-
-    columns_we_need = ["subject", "session", value_column]
-    simple = measure_table[columns_we_need].dropna()
-
-    if len(simple) == 0:
-        return pd.DataFrame(columns=["subject", "s1", "s2"])
-
-    # One column per session.
-    wide = simple.pivot_table(
-        index="subject",
-        columns="session",
-        values=value_column,
-        aggfunc="mean",
-    )
-
-    sessions = sorted(wide.columns.tolist())
-
-    # If there is only one session in the data, there is nothing to correlate.
-    if len(sessions) < 2:
-        return pd.DataFrame(columns=["subject", "s1", "s2"])
-
-    wide = wide.rename(columns={sessions[0]: "s1", sessions[1]: "s2"})
-
-    # dropna() here removes subjects who are missing one of the two sessions.
-    return wide[["s1", "s2"]].dropna().reset_index()
+from ..permutations import permute_distance_labels_nearfar
 
 
 def run(t, plot=True):
-    """Run H4."""
-
-    results = {}
+    """Run H4. Returns {"skipped": True} if there is no patient in the data."""
 
     # ------------------------------------------------------------------
-    # Step 1. Build the collision PSE, pooled over speeds.
-    # ------------------------------------------------------------------
-    # The collision indices table stores pse_slow and pse_fast separately.
-    # The prereg asks for the POOLED boundary, so we average the two.
-
-    collision_with_pooled_pse = t.collision_indices_young.copy()
-
-    collision_with_pooled_pse["pse_pooled"] = (
-        collision_with_pooled_pse["pse_slow"]
-        + collision_with_pooled_pse["pse_fast"]
-    ) / 2.0
-
-    # ------------------------------------------------------------------
-    # Step 2. The four measures we test, and where each one lives.
+    # Step 0. Do we even have a patient?
     # ------------------------------------------------------------------
 
-    measures = [
-        ("x_c",        t.xc_young,                 "rank"),
-        ("pse_pooled", collision_with_pooled_pse,  "cm"),
-        ("delta_pps",  t.delta_pps_young,          "rank"),
-        ("delta_coll", t.collision_indices_young,  "cm"),
-    ]
+    if not t.has_patient:
+        print("H4 skipped: there is no patient in this dataset.")
+        print("  This is expected while you are only running healthy pilots.")
+        return {"skipped": True}
 
-    results["measures"] = measures
+    results = {"skipped": False}
+
+    print(f"Patient:         {t.patient_id}")
+    print(f"Matched control: {t.control_id}")
+    print()
 
     # ------------------------------------------------------------------
-    # Step 3. Correlate session 1 with session 2 for each measure.
+    # Step 1. Get the patient's PPS trials, session by session.
+    # ------------------------------------------------------------------
+
+    patient_trials = t.pps_trials[t.pps_trials["subject"] == t.patient_id].copy()
+
+    sessions = sorted(patient_trials["session"].dropna().unique())
+
+    print(f"Patient PPS sessions available: {sessions}")
+    print()
+
+    results["patient_trials"] = patient_trials
+    results["sessions"] = sessions
+
+    # ------------------------------------------------------------------
+    # Step 2. Run the permutation test in each session.
     # ------------------------------------------------------------------
 
     rows = []
+    permutation_results = {}
 
-    for column, table, unit in measures:
+    for session in sessions:
 
-        pairs = build_session_pairs(table, column)
+        one_session = patient_trials[patient_trials["session"] == session].copy()
 
-        # Fewer than 2 subjects with both sessions: nothing to correlate.
-        if len(pairs) < 2:
-            rows.append({
-                "measure": column,
-                "unit": unit,
-                "n_subjects": len(pairs),
-                "spearman_rho": np.nan,
-                "exact_p": np.nan,
-                "sdc": np.nan,
-            })
-            continue
-
-        spearman = exact_spearman_permutation(
-            pairs["s1"],
-            pairs["s2"],
-            alternative="greater",
+        # The seed is offset by the session number so that session 1 and session 2
+        # do not get the exact same 5000 shuffles. Same seed = same shuffles =
+        # correlated results, which would be wrong.
+        permutation = permute_distance_labels_nearfar(
+            one_session,
+            n_perm=config.N_BOOT,
+            seed=config.RANDOM_SEED + int(session),
         )
 
-        sdc = compute_sdc(pairs["s1"], pairs["s2"])
+        permutation_results[session] = permutation
+
+        observed = permutation["observed"]
+        p_value = permutation["p"]
+
+        session_supported = (observed > 0) and (p_value < config.ALPHA)
 
         rows.append({
-            "measure": column,
-            "unit": unit,
-            "n_subjects": len(pairs),
-            "spearman_rho": spearman["spearman_rho"],
-            "exact_p": spearman["exact_permutation_p"],
-            "sdc": sdc,
+            "session": session,
+            "n_usable_trials": int(one_session["usable"].sum()),
+            "observed_nearfar_ms": observed,
+            "permutation_p": p_value,
+            "n_permutations": permutation["n_perm"],
+            "supported": session_supported,
         })
 
-    reliability = pd.DataFrame(rows)
-    results["reliability"] = reliability
+    summary = pd.DataFrame(rows)
+
+    results["summary"] = summary
+    results["permutation_results"] = permutation_results
 
     # ------------------------------------------------------------------
-    # Step 4. Pull out the SDC for delta_pps. H6b needs it.
+    # Step 3. The verdict. Every session must pass.
     # ------------------------------------------------------------------
 
-    delta_pps_row = reliability[reliability["measure"] == "delta_pps"]
-
-    if len(delta_pps_row) > 0 and pd.notna(delta_pps_row["sdc"].iloc[0]):
-        sdc_delta_pps = float(delta_pps_row["sdc"].iloc[0])
+    if len(summary) > 0:
+        supported_overall = bool(summary["supported"].all())
     else:
-        sdc_delta_pps = np.nan
+        supported_overall = False
 
-    # Named in capitals because the notebook assigns it to t.sdc_delta_pps and
-    # hands it to H6b. This is the one number H4 exports.
-    results["SDC_DELTA_PPS"] = sdc_delta_pps
+    # This name is what the notebook's summary table reads.
+    results["h4_supported_overall"] = supported_overall
 
     report(results)
 
     if plot:
         fig = make_figure(results)
-        figures.save(fig, "h4_reliability")
+        figures.save(fig, "h4_patient_nearfar")
         plt.show()
         results["figure"] = fig
 
@@ -181,76 +145,67 @@ def run(t, plot=True):
 def report(results):
     """Print the H4 numbers."""
 
-    print("H4: test-retest reliability (descriptive, n is small)")
+    print("H4: near-far index in the patient, tested against a shuffled-distance null")
     print()
-    print(results["reliability"].round(3).to_string(index=False))
+    print(results["summary"].round(4).to_string(index=False))
     print()
 
-    sdc = results["SDC_DELTA_PPS"]
-
-    if np.isfinite(sdc):
-        print(f"SDC for Delta_PPS = {sdc:.3f}")
-        print("  This is the noise floor. H6b will only call a dopamine effect real")
-        print("  if it is BIGGER than this.")
+    if results["h4_supported_overall"]:
+        print("  H4 IS SUPPORTED: in every session the patient's facilitation was")
+        print("  stronger near the body than chance would produce.")
     else:
-        print("SDC for Delta_PPS: not estimable (need at least 2 subjects with 2 sessions).")
-        print("  H6b will therefore have no noise floor to check against.")
+        print("  H4  is NOT supported in every session.")
 
 
 def make_figure(results):
-    """Build the H4 figure. One panel per measure."""
+    """Build the H4 figure. One null-distribution histogram per session."""
 
-    measures = results["measures"]
+    sessions = results["sessions"]
+    permutation_results = results["permutation_results"]
+
+    n_panels = max(1, len(sessions))
 
     fig, axes = figures.new_figure(
-        n_panels=len(measures),
-        width=figures.DOUBLE_COLUMN,
-        height=2.2,
+        n_panels=n_panels,
+        width=figures.DOUBLE_COLUMN if n_panels > 1 else figures.ONE_HALF_COLUMN,
+        height=2.6,
     )
 
-    for ax, (column, table, unit) in zip(axes, measures):
+    for ax, session in zip(axes, sessions):
 
-        pairs = build_session_pairs(table, column)
+        permutation = permutation_results[session]
 
-        if len(pairs) >= 2:
+        # The grey histogram is the null: every near-far value we got by shuffling
+        # the distance labels. If distance did not matter, the real value would
+        # land somewhere in here.
+        ax.hist(
+            permutation["permuted"],
+            bins=40,
+            color=style.CONTROL,
+            edgecolor="white",
+            linewidth=0.3,
+        )
 
-            ax.scatter(
-                pairs["s1"],
-                pairs["s2"],
-                s=35,
-                color=style.CONTROL,
-                edgecolor=style.INK,
-                linewidth=0.6,
-                zorder=3,
-            )
+        # The patient's real value.
+        ax.axvline(
+            permutation["observed"],
+            color=style.PATIENT,
+            linewidth=1.8,
+            label=f"observed = {permutation['observed']:.1f} ms",
+        )
 
-            for _, row in pairs.iterrows():
-                ax.text(row["s1"], row["s2"], f"  {row['subject']}", fontsize=6)
+        ax.axvline(0, linestyle="--", linewidth=0.8, color="gray")
 
-            # The identity line. A perfectly reliable measure would put every dot
-            # exactly on it.
-            low = min(pairs["s1"].min(), pairs["s2"].min())
-            high = max(pairs["s1"].max(), pairs["s2"].max())
-
-            ax.plot([low, high], [low, high],
-                    linestyle="--", color="gray", linewidth=0.8, alpha=0.7, zorder=1)
-        else:
-            ax.text(
-                0.5, 0.5,
-                "not enough\nsubjects with\nboth sessions",
-                ha="center", va="center",
-                transform=ax.transAxes,
-                fontsize=6,
-                color="#8A8A8A",
-            )
-
-        ax.set_xlabel(f"Session 1 ({unit})")
-        ax.set_ylabel(f"Session 2 ({unit})")
-        ax.set_title(column)
+        ax.set_xlabel("NearFar$_{PPS}$ under shuffled\ndistance labels (ms)")
+        ax.set_ylabel("Count")
+        ax.set_title(f"Session {session}: p = {permutation['p']:.4f}")
+        ax.legend()
 
         style.clean(ax)
 
-    figures.label_panels(axes)
+    if len(sessions) > 1:
+        figures.label_panels(axes)
+
     fig.tight_layout()
 
     return fig

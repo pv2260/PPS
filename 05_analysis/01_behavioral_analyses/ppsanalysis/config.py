@@ -21,19 +21,16 @@ TRIAL_FILE = re.compile(
 )
 POSITION_COL_PATTERN = re.compile(r"^position_(D\d+)_ms$")
 
+
 # ---------------------------------------------------------------------------
 # Subject metadata (setup.json is not read: it contains inaccurate information)
 # ---------------------------------------------------------------------------
 SUBJECT_META = {
-    "theo":  {"group": "control", "cohort": "pilot", "has_dbs": False, "shoulder_width_cm": 42.0},
+    "theo":  {"group": "patient", "cohort": "pilot", "has_dbs": False, "shoulder_width_cm": 42.0},
     "franc": {"group": "control", "cohort": "pilot", "has_dbs": False, "shoulder_width_cm": 42.0},
-    "pam":   {"group": "patient", "cohort": "pilot", "has_dbs": False, "shoulder_width_cm": 42.0},
 }
-
-
-# Default controls.
-YOUNG_CONTROL_SUBJECTS = ["franc", "theo"]
-PATIENT_ID = None
+YOUNG_CONTROL_SUBJECTS = "franc"
+PATIENT_ID =  "theo"
 MATCHED_CONTROL_ID = None
 CLINICAL_SESSION = None
 CLINICAL_COHORT = None

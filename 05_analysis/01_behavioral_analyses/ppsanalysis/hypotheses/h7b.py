@@ -1,10 +1,10 @@
 """
-H8b. In the patient-control pair: does reduced PPS plasticity go WITH reduced
+H7b. In the patient-control pair: does reduced PPS plasticity go WITH reduced
      Hit-or-Miss performance?
 
 WHAT WE ARE TESTING
 -------------------
-H8a asked this across five healthy controls. H8b asks it within our one patient.
+H7a asked this across five healthy controls. H7b asks it within our one patient.
 
 We have five deviations, each measured as (patient minus control):
 
@@ -38,15 +38,15 @@ WHY THE BOOTSTRAP MUST BE PAIRED
 --------------------------------
 For the joint criterion to mean anything, resample #37 of the PPS task and
 resample #37 of the Hit-or-Miss task must come from the SAME person on the SAME
-bootstrap draw. So we merge on the bootstrap index. This is also why H8b reuses
+bootstrap draw. So we merge on the bootstrap index. This is also why H7b reuses
 H6's PPS bootstrap rather than running a fresh one: a fresh one would have a
 different random pairing and the joint probabilities would be meaningless.
 
-H8b.3 IS THE ODD ONE OUT
+H7b.3 IS THE ODD ONE OUT
 ------------------------
-For H8b.1 and H8b.2, "worse" means a NEGATIVE deviation (less plasticity, lower
+For H7b.1 and H7b.2, "worse" means a NEGATIVE deviation (less plasticity, lower
 accuracy). But for carryover, "worse" means a POSITIVE deviation: more carryover
-means you are failing to update. So the concordant pattern for H8b.3 is
+means you are failing to update. So the concordant pattern for H7b.3 is
 (D_PPS < 0 AND D_carryover > 0), i.e. OPPOSITE signs. This is easy to get wrong.
 """
 
@@ -58,7 +58,7 @@ import style
 
 from .. import config
 from .. import figures
-from ..stats_utils import classify_h8b_concordant, classify_h8b_opposite
+from ..stats_utils import classify_h7b_concordant, classify_h7b_opposite
 from ..collision import (
     compute_collision_indices_one_session,
     bootstrap_collision_indices_one_session,
@@ -66,10 +66,10 @@ from ..collision import (
 
 
 def build_bootstrap(t, h6_results):
-    """Build the paired bootstrap table that all three H8b tests share."""
+    """Build the paired bootstrap table that all three H7b tests share."""
 
     if not t.has_patient:
-        print("H8b skipped: there is no patient in this dataset.")
+        print("H7b skipped: there is no patient in this dataset.")
         return {"skipped": True, "boot": pd.DataFrame()}
 
     patient_session = t.patient_session
@@ -119,7 +119,7 @@ def build_bootstrap(t, h6_results):
          "control": control_indices["carryover_cm"], "difference": observed["d_carryover"]},
     ])
 
-    print("H8b: observed deviations (patient minus control)")
+    print("H7b: observed deviations (patient minus control)")
     print()
     print(observed_table.round(3).to_string(index=False))
     print()
@@ -165,8 +165,8 @@ def build_bootstrap(t, h6_results):
     pps_pair = h6_results.get("h6_pair_boot", pd.DataFrame())
 
     if len(pps_pair) == 0:
-        print("H8b: no PPS bootstrap available (H6 Test A did not pass), so the")
-        print("  paired bootstrap cannot be built and H8b cannot run.")
+        print("H7b: no PPS bootstrap available (H6 Test A did not pass), so the")
+        print("  paired bootstrap cannot be built and H7b cannot run.")
         boot = pd.DataFrame()
     else:
         boot = pps_pair[["boot", "d_pps"]].merge(
@@ -174,7 +174,7 @@ def build_bootstrap(t, h6_results):
             on="boot",
             how="inner",
         )
-        print(f"H8b paired bootstrap samples: {len(boot)}")
+        print(f"H7b paired bootstrap samples: {len(boot)}")
         print()
 
     return {
@@ -186,11 +186,11 @@ def build_bootstrap(t, h6_results):
 
 
 def run_one(bootstrap, y_column, y_label, title, concordant_means_same_sign, plot_ax=None):
-    """Run one H8b sub-test.
+    """Run one H7b sub-test.
 
     concordant_means_same_sign :
-        True  for H8b.1 and H8b.2, where "both worse" means both NEGATIVE.
-        False for H8b.3, where "both worse" means D_PPS negative but carryover
+        True  for H7b.1 and H7b.2, where "both worse" means both NEGATIVE.
+        False for H7b.3, where "both worse" means D_PPS negative but carryover
               POSITIVE (more carryover = worse updating).
     """
 
@@ -202,13 +202,13 @@ def run_one(bootstrap, y_column, y_label, title, concordant_means_same_sign, plo
         return {"classification": "not estimable"}
 
     if concordant_means_same_sign:
-        result = classify_h8b_concordant(
+        result = classify_h7b_concordant(
             boot["d_pps"],
             boot[y_column],
             threshold=config.BOOT_SIGN_THRESHOLD,
         )
     else:
-        result = classify_h8b_opposite(
+        result = classify_h7b_opposite(
             boot["d_pps"],
             boot[y_column],
             threshold=config.BOOT_SIGN_THRESHOLD,
@@ -275,10 +275,10 @@ def draw_joint_scatter(ax, boot, y_column, observed_x, observed_y, y_label, titl
     style.clean(ax)
 
 
-def run(t, h6_results, plot=True):
-    """Run all three parts of H8b. Needs the H6 results for the paired bootstrap."""
+def run(t, h5_results, plot=True):
+    """Run all three parts of H7b. Needs the H6 results for the paired bootstrap."""
 
-    bootstrap = build_bootstrap(t, h6_results)
+    bootstrap = build_bootstrap(t, h5_results)
 
     if bootstrap["skipped"] or len(bootstrap["boot"]) == 0:
         return {"skipped": True}
@@ -290,33 +290,33 @@ def run(t, h6_results, plot=True):
     else:
         axes = [None, None, None]
 
-    results["h8b_1"] = run_one(
-        bootstrap, "d_coll", r"$D_{coll}$ (cm)", "H8b.1",
+    results["h7b_1"] = run_one(
+        bootstrap, "d_coll", r"$D_{coll}$ (cm)", "H7b.1",
         concordant_means_same_sign=True, plot_ax=axes[0],
     )
 
-    results["h8b_2_near"] = run_one(
-        bootstrap, "d_nearacc", r"$D_{nearacc}$", "H8b.2 (primary)",
+    results["h7b_2_near"] = run_one(
+        bootstrap, "d_nearacc", r"$D_{nearacc}$", "H7b.2 (primary)",
         concordant_means_same_sign=True, plot_ax=axes[1],
     )
 
-    # H8b.3: "worse" carryover is MORE carryover, so the concordant pattern has
+    # H7b.3: "worse" carryover is MORE carryover, so the concordant pattern has
     # OPPOSITE signs. See the module docstring.
-    results["h8b_3"] = run_one(
-        bootstrap, "d_carryover", r"$D_{carryover}$ (cm)", "H8b.3",
+    results["h7b_3"] = run_one(
+        bootstrap, "d_carryover", r"$D_{carryover}$ (cm)", "H7b.3",
         concordant_means_same_sign=False, plot_ax=axes[2],
     )
 
     # Also run overall accuracy, but do not plot it: it is descriptive only.
-    results["h8b_2_overall"] = run_one(
-        bootstrap, "d_acc", r"$D_{acc}$", "H8b.2 (descriptive: overall accuracy)",
+    results["h7b_2_overall"] = run_one(
+        bootstrap, "d_acc", r"$D_{acc}$", "H7b.2 (descriptive: overall accuracy)",
         concordant_means_same_sign=True, plot_ax=None,
     )
 
     if plot:
         figures.label_panels(axes)
         fig.tight_layout()
-        figures.save(fig, "h8b_joint_signs")
+        figures.save(fig, "h7b_joint_signs")
         plt.show()
         results["figure"] = fig
 
@@ -325,13 +325,13 @@ def run(t, h6_results, plot=True):
     # ------------------------------------------------------------------
 
     summary = pd.DataFrame([
-        {"hypothesis": "H8b.1",                    "classification": results["h8b_1"]["classification"]},
-        {"hypothesis": "H8b.2 (near, primary)",    "classification": results["h8b_2_near"]["classification"]},
-        {"hypothesis": "H8b.2 (overall, descr.)",  "classification": results["h8b_2_overall"]["classification"]},
-        {"hypothesis": "H8b.3",                    "classification": results["h8b_3"]["classification"]},
+        {"hypothesis": "H7b.1",                    "classification": results["h7b_1"]["classification"]},
+        {"hypothesis": "H7b.2 (near, primary)",    "classification": results["h7b_2_near"]["classification"]},
+        {"hypothesis": "H7b.2 (overall, descr.)",  "classification": results["h7b_2_overall"]["classification"]},
+        {"hypothesis": "H7b.3",                    "classification": results["h7b_3"]["classification"]},
     ])
 
-    print("H8b summary")
+    print("H7b summary")
     print()
     print(summary.to_string(index=False))
 

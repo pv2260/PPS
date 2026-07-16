@@ -334,7 +334,7 @@ def joint_sign_proportion(boot_d1, boot_d2, sign1, sign2):
     return float((cond1 & cond2).mean())
 
 
-def classify_h8b_concordant(boot_d1, boot_d2, threshold=0.95):
+def classify_h7b_concordant(boot_d1, boot_d2, threshold=0.95):
     """Classify a pair of patient-minus-control bootstrap deviations.
 
     Concordant under: both negative in >= threshold of resamples.
@@ -365,8 +365,8 @@ def classify_h8b_concordant(boot_d1, boot_d2, threshold=0.95):
     }
 
 
-def classify_h8b_opposite(boot_d_pps, boot_d_carry, threshold=0.95):
-    """H8b.3 classification: predicted pattern is opposite-direction.
+def classify_h7b_opposite(boot_d_pps, boot_d_carry, threshold=0.95):
+    """H7b.3 classification: predicted pattern is opposite-direction.
 
     Concordant under-calibration with increased carryover: D_PPS < 0 AND D_carryover > 0.
     Concordant over-calibration with reduced carryover: D_PPS > 0 AND D_carryover < 0.
