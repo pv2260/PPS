@@ -1,5 +1,0 @@
-subject,session,task,file,folder,n_raw_rows,group,cohort,has_dbs,shoulder_width_cm
-franc,1,2,sub-franc-task2_session-1_task2_trials.csv,franc-task2_s1,165,control,pilot,False,42.0
-franc,1,1,sub-franc_session-1_task1_trials.csv,franc_s1,420,control,pilot,False,42.0
-theo,1,2,sub-theo_session-1_task2_trials.csv,theo_s1-task2,159,patient,pilot,False,42.0
-theo,1,1,sub-theo_session-1_task1_trials.csv,theo_s1,462,patient,pilot,False,42.0
